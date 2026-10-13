@@ -9,7 +9,7 @@ val ciKeystore: String? = System.getenv("KEYSTORE_FILE")?.takeIf { file(it).exis
 
 android {
     namespace = "com.example.sensordash"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.sensordash"
