@@ -43,11 +43,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.sensordash.data.ClockState
+import com.example.sensordash.data.DeviceState
+import kotlin.math.roundToInt
 
 // ===== PHASE 2: every value below is a fixed DEMO placeholder, not a live reading. =====
 
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(state: DeviceState) {
     BoxWithConstraints(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0A1424), Dash.Bg))),
     ) {
@@ -58,9 +61,9 @@ fun DashboardScreen() {
                 verticalArrangement = Arrangement.spacedBy(sc(6f)),
             ) {
                 Header()
-                Cluster(Modifier.weight(1.75f))
+                Cluster(state, Modifier.weight(1.75f))
                 SensorRow(Modifier.weight(1f))
-                InfoRow(Modifier.weight(0.85f))
+                InfoRow(state, Modifier.weight(0.85f))
             }
         }
     }
@@ -92,7 +95,7 @@ private fun Header() {
             T("Live device dashboard", 10.5f, Dash.Muted)
         }
         Spacer(Modifier.weight(1f))
-        Chip("DEMO DATA - not live readings")
+        Chip("MIXED: panels marked Demo are placeholders")
         Spacer(Modifier.width(sc(10f)))
         IconBox { // fullscreen brackets
             val w = size.width
@@ -130,22 +133,25 @@ private fun IconBox(draw: DrawScope.() -> Unit) {
 // ---------- Top cluster ----------
 
 @Composable
-private fun Cluster(modifier: Modifier) {
+private fun Cluster(state: DeviceState, modifier: Modifier) {
     Row(
         modifier.fillMaxWidth().drawBehind { drawCockpit() }.padding(horizontal = sc(30f)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         GaugeCell(1f, 0.84f, 0f) {
-            InstrumentGauge(78f, "BATTERY", "78%", "3h 24m remaining", Modifier.fillMaxSize())
+            val b = state.battery
+            InstrumentGauge(b.percent?.toFloat(), "BATTERY", b.percent?.let { "$it%" } ?: "N/A", b.status, Modifier.fillMaxSize())
         }
         GaugeCell(1.32f, 1f, -5f) {
+            val c = state.cpu
             InstrumentGauge(
-                42f, "APP CPU", "42%", "Thermal: Normal", Modifier.fillMaxSize(),
+                c.percent, "APP CPU", c.percent?.let { "${it.roundToInt()}%" } ?: "--", c.note, Modifier.fillMaxSize(),
                 GaugeStyle(labelY = -0.36f, readoutY = 0.34f, readoutSize = 0.27f, subY = 0.66f),
             )
         }
         GaugeCell(1f, 0.84f, 0f) {
-            InstrumentGauge(68f, "MEMORY", "68%", "approx. 10.9 / 15.9 GB", Modifier.fillMaxSize())
+            val m = state.memory
+            InstrumentGauge(m.percent, "MEMORY", m.percent?.let { "${it.roundToInt()}%" } ?: "N/A", m.detail, Modifier.fillMaxSize())
         }
     }
 }
@@ -255,10 +261,10 @@ private fun ColumnScope.AxisBlock(vararg rows: Triple<String, Float, String>) {
 }
 
 @Composable
-private fun Footer(label: String) {
+private fun Footer(label: String, chip: String = "Demo", ok: Boolean = false) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         T(label, 11f, Dash.Muted)
-        Chip("Demo")
+        Chip(chip, ok)
     }
 }
 
@@ -313,33 +319,33 @@ private fun RadarView(modifier: Modifier) {
 // ---------- Info row: 4 panels ----------
 
 @Composable
-private fun InfoRow(modifier: Modifier) {
+private fun InfoRow(state: DeviceState, modifier: Modifier) {
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sc(6f))) {
         Panel("Network", Modifier.weight(1f).fillMaxHeight()) {
-            KvBlock("Connection" to "Wi-Fi", "Downlink" to "72 Mbps", "Uplink" to "34 Mbps")
-            Footer("Network data")
+            KvBlock("Connection" to state.network.connection, "Downlink" to state.network.down, "Uplink" to state.network.up)
+            Footer("Status", state.network.status, state.network.online)
         }
         Panel("Clock", Modifier.weight(1.1f).fillMaxHeight()) {
             Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(0.8f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    ClockFace(Modifier.fillMaxHeight(0.95f).aspectRatio(1f))
+                    ClockFace(state.clock, Modifier.fillMaxHeight(0.95f).aspectRatio(1f))
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(sc(2f))) {
-                    T("21:22:48", 26f, weight = FontWeight.Bold)
-                    T("Apr 26, 2025", 12f, Dash.Muted)
-                    T("Saturday", 12f, Dash.Muted)
+                    T(state.clock.time, 26f, weight = FontWeight.Bold)
+                    T(state.clock.date, 12f, Dash.Muted)
+                    T(state.clock.weekday, 12f, Dash.Muted)
                 }
             }
         }
         Panel("Device", Modifier.weight(1.1f).fillMaxHeight()) {
-            KvBlock("Platform" to "Android", "Model" to "Demo device", "Language" to "en-US", "Screen" to "demo")
+            KvBlock("Platform" to state.device.platform, "Model" to state.device.model, "Language" to state.device.language, "Screen" to state.device.screenDp)
         }
         Panel("Display", Modifier.weight(0.85f).fillMaxHeight()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                DisplayRing(Modifier.fillMaxHeight().aspectRatio(1f))
+                DisplayRing(state.display.resolution, Modifier.fillMaxHeight().aspectRatio(1f))
             }
-            KvLine("Pixel ratio", "2.0")
-            KvLine("Orientation", "Landscape")
+            KvLine("Pixel ratio", state.display.density)
+            KvLine("Orientation", state.display.orientation)
         }
     }
 }
@@ -370,8 +376,11 @@ private fun KvLine(k: String, v: String) {
 }
 
 @Composable
-private fun ClockFace(modifier: Modifier) {
+private fun ClockFace(clock: ClockState, modifier: Modifier) {
     val tm = rememberTextMeasurer()
+    val hourDeg = (clock.hour % 12) * 30f + clock.minute * 0.5f + clock.second / 120f
+    val minDeg = clock.minute * 6f + clock.second * 0.1f
+    val secDeg = clock.second * 6f
     Canvas(modifier) {
         val c = center
         val r = size.minDimension / 2f
@@ -385,15 +394,15 @@ private fun ClockFace(modifier: Modifier) {
         centeredText(tm, "3", polar(c, r * 0.6f, 90f), r * 0.14f, Color.White)
         centeredText(tm, "6", polar(c, r * 0.6f, 180f), r * 0.14f, Color.White)
         centeredText(tm, "9", polar(c, r * 0.6f, 270f), r * 0.14f, Color.White)
-        drawLine(Color.White, c, polar(c, r * 0.45f, 281f), r * 0.06f, StrokeCap.Round)
-        drawLine(Color.White, c, polar(c, r * 0.68f, 137f), r * 0.04f, StrokeCap.Round)
-        drawLine(Dash.Red, polar(c, -r * 0.15f, 288f), polar(c, r * 0.76f, 288f), r * 0.015f)
+        drawLine(Color.White, c, polar(c, r * 0.45f, hourDeg), r * 0.06f, StrokeCap.Round)
+        drawLine(Color.White, c, polar(c, r * 0.68f, minDeg), r * 0.04f, StrokeCap.Round)
+        drawLine(Dash.Red, polar(c, -r * 0.15f, secDeg), polar(c, r * 0.76f, secDeg), r * 0.015f)
         drawCircle(Dash.Red, r * 0.04f, c)
     }
 }
 
 @Composable
-private fun DisplayRing(modifier: Modifier) {
+private fun DisplayRing(resolution: String, modifier: Modifier) {
     val tm = rememberTextMeasurer()
     Canvas(modifier) {
         val c = center
@@ -401,8 +410,8 @@ private fun DisplayRing(modifier: Modifier) {
         drawCircle(Color(0xFF050A12), r * 0.9f)
         drawCircle(Color(0x6627B4FF), r * 0.9f, style = Stroke(3f))
         drawArc(Dash.Cyan, -110f, 130f, false, Offset(c.x - r * 0.9f, c.y - r * 0.9f), Size(r * 1.8f, r * 1.8f), style = Stroke(r * 0.05f, cap = StrokeCap.Round))
-        centeredText(tm, "demo", Offset(c.x, c.y - r * 0.12f), r * 0.2f, Color.White, FontWeight.SemiBold)
-        centeredText(tm, "placeholder", Offset(c.x, c.y + r * 0.16f), r * 0.14f, Dash.Muted)
+        centeredText(tm, resolution, Offset(c.x, c.y - r * 0.1f), r * 0.2f, Color.White, FontWeight.SemiBold)
+        centeredText(tm, "pixels", Offset(c.x, c.y + r * 0.18f), r * 0.14f, Dash.Muted)
     }
 }
 
@@ -434,8 +443,8 @@ private fun Panel(title: String, modifier: Modifier, content: @Composable Column
 }
 
 @Composable
-private fun Chip(text: String) {
-    val col = Dash.Warn
+private fun Chip(text: String, ok: Boolean = false) {
+    val col = if (ok) Dash.Ok else Dash.Warn
     Row(
         Modifier.clip(CircleShape).background(col.copy(alpha = 0.12f))
             .border(1.dp, col.copy(alpha = 0.5f), CircleShape)
