@@ -16,8 +16,8 @@ android {
         minSdk = 26
         // 35 on purpose: apps targeting 36 can have the landscape lock ignored on tablets.
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-phase1"
+        versionCode = 2
+        versionName = "0.2.0-phase2"
     }
 
     if (ciKeystore != null) {
@@ -51,6 +51,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
+    implementation("androidx.compose.animation:animation-core")
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
 }
